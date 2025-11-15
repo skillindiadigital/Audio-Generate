@@ -44,17 +44,6 @@ const App: React.FC = () => {
         }
         return audioContextRef.current;
     }, []);
-
-    const preprocessText = (text: string): string => {
-        // Replace custom pause markers with SSML break tags.
-        const ssmlContent = text.replace(/\[pause(?:=(\d+))?\]/g, (_, duration) => `<break time="${duration || 800}ms"/>`);
-
-        // According to Gemini API documentation, any input containing SSML tags
-        // must be wrapped in <speak> tags for the API to interpret it as SSML.
-        // Without this wrapper, SSML tags like <break> are ignored, and more importantly,
-        // the speechConfig (which sets the voice) is also disregarded, leading to a default voice.
-        return `<speak>${ssmlContent}</speak>`;
-    };
     
     const handleSynthesize = useCallback(async () => {
         if (!script.trim()) {
@@ -65,11 +54,11 @@ const App: React.FC = () => {
         setError(null);
         setAudioChunks([]);
 
-        // Split script into chunks (e.g., by paragraphs)
-        const textChunks = script.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
+        // Split script into paragraphs. Each paragraph will become one audio chunk.
+        const paragraphs = script.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
         
-        if (textChunks.length === 0) {
-            setError("No valid text chunks found to synthesize.");
+        if (paragraphs.length === 0) {
+            setError("No valid text paragraphs found to synthesize.");
             setIsLoading(false);
             return;
         }
@@ -77,22 +66,53 @@ const App: React.FC = () => {
         const newAudioChunks: AudioChunk[] = [];
         const context = getAudioContext();
 
-        for (let i = 0; i < textChunks.length; i++) {
+        for (let i = 0; i < paragraphs.length; i++) {
+            const paragraph = paragraphs[i];
+            const paragraphBuffers: AudioBuffer[] = [];
+            
             try {
-                setProgressMessage(`Synthesizing chunk ${i + 1} of ${textChunks.length}...`);
-                const processedChunk = preprocessText(textChunks[i]);
-                const base64Audio = await synthesizeText(processedChunk, selectedVoice);
+                setProgressMessage(`Processing paragraph ${i + 1} of ${paragraphs.length}...`);
+                
+                // Split the paragraph by pause markers, keeping the markers.
+                const parts = paragraph.split(/(\[pause(?:=\d+)?\])/g).filter(part => part.trim().length > 0);
 
-                if (base64Audio) {
-                    const buffer = await decodeBase64Audio(base64Audio, context);
-                    const blob = audioBufferToWavBlob(buffer);
-                    newAudioChunks.push({ id: Date.now() + i, buffer, blob });
-                    setAudioChunks([...newAudioChunks]);
+                for (const part of parts) {
+                    const pauseMatch = part.match(/^\[pause(?:=(\d+))?\]$/);
+                    if (pauseMatch) {
+                        // This part is a pause marker. Create a silent buffer.
+                        const durationMs = pauseMatch[1] ? parseInt(pauseMatch[1], 10) : 800;
+                        const durationSeconds = durationMs / 1000;
+                        const silentBuffer = context.createBuffer(
+                            1, // mono
+                            Math.round(context.sampleRate * durationSeconds),
+                            context.sampleRate
+                        );
+                        paragraphBuffers.push(silentBuffer);
+                    } else {
+                        // This part is regular text. Clean out any non-speech tags and synthesize it.
+                        const cleanedText = part.replace(/\[[^\]]+\]/g, '').trim();
+                        if (cleanedText) { // Only synthesize if there's text left after cleaning
+                            const base64Audio = await synthesizeText(cleanedText, selectedVoice);
+                            if (base64Audio) {
+                                const buffer = await decodeBase64Audio(base64Audio, context);
+                                paragraphBuffers.push(buffer);
+                            }
+                        }
+                    }
                 }
+
+                // If any audio was generated for the paragraph, stitch it together.
+                if (paragraphBuffers.length > 0) {
+                    const stitchedBuffer = stitchAudioBuffers(paragraphBuffers, context);
+                    const blob = audioBufferToWavBlob(stitchedBuffer);
+                    newAudioChunks.push({ id: Date.now() + i, buffer: stitchedBuffer, blob });
+                    setAudioChunks([...newAudioChunks]); // Update UI progressively
+                }
+
             } catch (err) {
                 console.error(err);
                 const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
-                setError(`Failed on chunk ${i + 1}: ${errorMessage}`);
+                setError(`Failed on paragraph ${i + 1}: ${errorMessage}`);
                 setIsLoading(false);
                 return;
             }

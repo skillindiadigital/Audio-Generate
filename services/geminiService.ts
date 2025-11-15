@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality } from '@google/genai';
 
 // Assume API_KEY is set in the environment
@@ -16,7 +15,9 @@ export const synthesizeText = async (text: string, voice: string): Promise<strin
   try {
     const response = await ai.models.generateContent({
       model: model,
-      contents: [{ parts: [{ text }] }],
+      // The TTS model expects a simple string for text content, not a chat-style Content array.
+      // This was the likely cause of the "finishReason: OTHER" error.
+      contents: text,
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -30,12 +31,21 @@ export const synthesizeText = async (text: string, voice: string): Promise<strin
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (!base64Audio) {
-      throw new Error("No audio data received from API.");
+        console.error("API response did not contain audio data. Full response:", JSON.stringify(response, null, 2));
+        const finishReason = response.candidates?.[0]?.finishReason;
+        if (finishReason && finishReason !== 'STOP') {
+            throw new Error(`API returned no audio. Reason: ${finishReason}. This can happen if the content is empty or flagged by safety filters.`);
+        }
+        throw new Error("No audio data received from API. This may be caused by a content policy violation or an empty script part.");
     }
     
     return base64Audio;
   } catch (error) {
     console.error("Error synthesizing text:", error);
-    throw new Error("Failed to synthesize audio. Please check your script or API key.");
+    if (error instanceof Error) {
+        // Re-throw the specific error message from the try block or the original error.
+        throw error;
+    }
+    throw new Error("Failed to synthesize audio. Please check your script, API key, or network connection.");
   }
 };
