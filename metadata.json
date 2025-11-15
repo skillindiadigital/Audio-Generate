@@ -1,0 +1,7 @@
+{
+  "name": "GuruVaani TTS",
+  "description": "A Text-to-Speech engine configured for producing a single narrator audio from supplied text, specializing in a deep, spiritual, and contemplative tone of a middle-aged Indian male voice. It supports custom pause markers and is designed for long-form content like spiritual discourses or storytelling.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
