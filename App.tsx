@@ -12,16 +12,24 @@ import { LicenseModal } from './components/LicenseModal';
 import { Spinner } from './components/Spinner';
 
 const voiceOptions = [
-    { id: 'Kore', name: 'Guru (Kore)', description: 'Deep, warm, calm male voice. Ideal for spiritual narration.' },
-    { id: 'Puck', name: 'Storyteller (Puck)', description: 'Friendly and engaging male voice.' },
-    { id: 'Charon', name: 'Guide (Charon)', description: 'A deep, authoritative female voice.' },
-    { id: 'Fenrir', name: 'Instructor (Fenrir)', description: 'An energetic and clear male voice.' },
-    { id: 'Zephyr', name: 'Companion (Zephyr)', description: 'A warm and conversational female voice.' },
+    // Male Voices
+    { id: 'kore', name: 'Guru (kore)', description: 'A deep, calm, and warm voice, steady and compassionate. The ideal spiritual guide for reflective narration.' },
+    { id: 'puck', name: 'Storyteller (puck)', description: 'A friendly and engaging storyteller\'s voice, carrying a warm, sincere, and peaceful tone.' },
+    { id: 'fenrir', name: 'Instructor (fenrir)', description: 'A clear and composed instructor\'s voice, delivering content with a steady, compassionate, and spiritual undertone.' },
+    { id: 'algieba', name: 'Lecturer (algieba)', description: 'A deep, steady lecturer\'s voice, perfect for delivering profound spiritual or reflective content with authority and warmth.' },
+    { id: 'gacrux', name: 'Reassurance (gacrux)', description: 'A deeply calm and reassuring voice, full of compassion and sincerity, ideal for peaceful and contemplative messages.' },
+    { id: 'rasalgethi', name: 'Narrator (rasalgethi)', description: 'A mature narrator\'s voice, delivering stories with a wise, reflective tone and a slow, composed pace.' },
+    // Female Voices
+    { id: 'charon', name: 'Guide (charon)', description: 'A deep, steady guide\'s voice, exuding wisdom and peace. Authoritative yet compassionate for spiritual teachings.' },
+    { id: 'zephyr', name: 'Companion (zephyr)', description: 'A warm and compassionate companion\'s voice, speaking with a calm, reflective, and sincere tone.' },
+    { id: 'autonoe', name: 'Professional (autonoe)', description: 'A clear and professional voice, maintaining a calm, steady delivery for spiritual and reflective content.' },
+    { id: 'leda', name: 'Friend (leda)', description: 'A warm and friendly voice, sharing stories and wisdom with a sincere, compassionate, and peaceful delivery.' },
+    { id: 'callirrhoe', name: 'Youthful (callirrhoe)', description: 'A youthful voice that is clear and sincere, delivering messages with a calm, composed, and spiritual tone.' },
 ];
 
 const App: React.FC = () => {
     const [script, setScript] = useState<string>('');
-    const [selectedVoice, setSelectedVoice] = useState<string>('Kore');
+    const [selectedVoice, setSelectedVoice] = useState<string>('kore');
     const [audioChunks, setAudioChunks] = useState<AudioChunk[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [progressMessage, setProgressMessage] = useState<string>('');
@@ -39,9 +47,13 @@ const App: React.FC = () => {
 
     const preprocessText = (text: string): string => {
         // Replace custom pause markers with SSML break tags.
-        // The API can handle SSML fragments (like <break>) without the root <speak> tag.
-        // Removing the <speak> tag wrapper fixes an issue where the speechConfig was being ignored.
-        return text.replace(/\[pause(?:=(\d+))?\]/g, (_, duration) => `<break time="${duration || 800}ms"/>`);
+        const ssmlContent = text.replace(/\[pause(?:=(\d+))?\]/g, (_, duration) => `<break time="${duration || 800}ms"/>`);
+
+        // According to Gemini API documentation, any input containing SSML tags
+        // must be wrapped in <speak> tags for the API to interpret it as SSML.
+        // Without this wrapper, SSML tags like <break> are ignored, and more importantly,
+        // the speechConfig (which sets the voice) is also disregarded, leading to a default voice.
+        return `<speak>${ssmlContent}</speak>`;
     };
     
     const handleSynthesize = useCallback(async () => {
