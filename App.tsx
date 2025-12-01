@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { synthesizeText } from './services/geminiService';
 import { decodeBase64Audio, audioBufferToWavBlob, stitchAudioBuffers } from './utils/audioUtils';
+import { transliterateDevanagari } from './utils/transliteration';
 import { type AudioChunk } from './types';
 import { Header } from './components/Header';
 import { VoiceSelector } from './components/VoiceSelector';
@@ -54,8 +55,12 @@ const App: React.FC = () => {
         setError(null);
         setAudioChunks([]);
 
+        // Transliterate Devanagari script to Latin for TTS compatibility.
+        // This also handles special characters like ॐ and punctuation like ।
+        const transliteratedScript = transliterateDevanagari(script);
+
         // Split script into paragraphs. Each paragraph will become one audio chunk.
-        const paragraphs = script.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
+        const paragraphs = transliteratedScript.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
         
         if (paragraphs.length === 0) {
             setError("No valid text paragraphs found to synthesize.");

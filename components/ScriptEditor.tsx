@@ -24,6 +24,8 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({ script, setScript, d
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
             Supports up to 30,000 words. Scripts are chunked by paragraphs for processing.
             <br />
+            Hindi/Sanskrit (Devanagari) text will be automatically transliterated for pronunciation.
+            <br />
             <strong>Note:</strong> Only `[pause]` and `[pause=ms]` markers are currently supported.
         </p>
     </div>

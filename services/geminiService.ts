@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI, Modality, HarmCategory, HarmBlockThreshold } from '@google/genai';
 
 // Assume API_KEY is set in the environment
 const API_KEY = process.env.API_KEY;
@@ -11,13 +11,32 @@ if (!API_KEY) {
 const ai = new GoogleGenAI({ apiKey: API_KEY! });
 const model = "gemini-2.5-flash-preview-tts";
 
+const safetySettings = [
+  {
+    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+  {
+    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+    threshold: HarmBlockThreshold.BLOCK_NONE,
+  },
+];
+
 export const synthesizeText = async (text: string, voice: string): Promise<string | null> => {
   try {
     const response = await ai.models.generateContent({
       model: model,
-      // The TTS model expects a simple string for text content, not a chat-style Content array.
-      // This was the likely cause of the "finishReason: OTHER" error.
-      contents: text,
+      // The TTS model expects a structured Content object, not a plain string.
+      contents: [{ parts: [{ text: text }] }],
+      safetySettings: safetySettings,
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
