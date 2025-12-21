@@ -36,8 +36,8 @@ export const synthesizeText = async (text: string, voice: string): Promise<strin
     const response = await ai.models.generateContent({
       model: modelName,
       contents: [{ parts: [{ text: text }] }],
-      safetySettings: safetySettings,
       config: {
+        safetySettings: safetySettings,
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
