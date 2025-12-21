@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { synthesizeText } from './services/geminiService';
 import { decodeBase64Audio, audioBufferToWavBlob, stitchAudioBuffers } from './utils/audioUtils';
-import { transliterateDevanagari } from './utils/transliteration';
+import { prepareTextForTTS } from './utils/transliteration';
 import { type AudioChunk } from './types';
 import { Header } from './components/Header';
 import { VoiceSelector } from './components/VoiceSelector';
@@ -55,12 +55,12 @@ const App: React.FC = () => {
         setError(null);
         setAudioChunks([]);
 
-        // Transliterate Devanagari script to Latin for TTS compatibility.
-        // This also handles special characters like ॐ and punctuation like ।
-        const transliteratedScript = transliterateDevanagari(script);
+        // Clean up and prepare text (e.g. handle symbols like ॐ) 
+        // We no longer transliterate to Latin because Gemini 2.5 Flash TTS handles Hindi/Sanskrit natively much better.
+        const preparedScript = prepareTextForTTS(script);
 
         // Split script into paragraphs. Each paragraph will become one audio chunk.
-        const paragraphs = transliteratedScript.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
+        const paragraphs = preparedScript.split(/\n\s*\n/).filter(chunk => chunk.trim().length > 0);
         
         if (paragraphs.length === 0) {
             setError("No valid text paragraphs found to synthesize.");
@@ -94,9 +94,9 @@ const App: React.FC = () => {
                         );
                         paragraphBuffers.push(silentBuffer);
                     } else {
-                        // This part is regular text. Clean out any non-speech tags and synthesize it.
+                        // Clean out any non-speech tags and synthesize the original script.
                         const cleanedText = part.replace(/\[[^\]]+\]/g, '').trim();
-                        if (cleanedText) { // Only synthesize if there's text left after cleaning
+                        if (cleanedText) {
                             const base64Audio = await synthesizeText(cleanedText, selectedVoice);
                             if (base64Audio) {
                                 const buffer = await decodeBase64Audio(base64Audio, context);
@@ -106,12 +106,11 @@ const App: React.FC = () => {
                     }
                 }
 
-                // If any audio was generated for the paragraph, stitch it together.
                 if (paragraphBuffers.length > 0) {
                     const stitchedBuffer = stitchAudioBuffers(paragraphBuffers, context);
                     const blob = audioBufferToWavBlob(stitchedBuffer);
                     newAudioChunks.push({ id: Date.now() + i, buffer: stitchedBuffer, blob });
-                    setAudioChunks([...newAudioChunks]); // Update UI progressively
+                    setAudioChunks([...newAudioChunks]);
                 }
 
             } catch (err) {
